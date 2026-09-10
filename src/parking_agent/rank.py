@@ -43,7 +43,7 @@ def rank_candidates(
         dist = haversine_km(lat, lon, c["lat"], c["lon"])
         if dist > radius_km + 1e-9:
             continue
-        if need_disabled and not c["disabled"]:
+        if need_disabled and c.get("disabled") is False:
             continue
         if not is_open(c, open_at):
             continue
@@ -102,6 +102,10 @@ def rank_candidates(
                 "base_fee": s["base_fee"],
                 "unit_minutes": s["unit_minutes"],
                 "unit_fee": s["unit_fee"],
+                "disabled": s.get("disabled"),
+                "free_now": (s.get("realtime") or {}).get("free_now")
+                if isinstance(s.get("realtime"), dict)
+                else None,
             }
         )
     return out

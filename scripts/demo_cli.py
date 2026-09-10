@@ -54,7 +54,8 @@ def main() -> None:
             print()  # 스트림 종료 줄바꿈
             if emitted[0] == 0:
                 # 명확화/폴백 경로는 스트리밍 토큰이 없으므로 완성본 출력
-                print(f"에이전트: {out['answer']}")
+                # ("에이전트: " prefix는 위에서 이미 출력됨)
+                print(out["answer"])
             print(f"[파라미터] {out['params'].model_dump()} (추출:{out['trace'].get('source')})")
             if out["ranked"]:
                 print(f"[랭킹] {' > '.join(r['id'] for r in out['ranked'])}")

@@ -31,8 +31,13 @@ def _template_answer(params: RankingParams, ranked: list[dict]) -> str:
         formula = fee_formula(
             r["base_minutes"], r["base_fee"], r["unit_minutes"], r["unit_fee"], params.minutes
         )
+        extra = ""
+        if r.get("free_now") is not None:
+            extra += f", 잔여 {r['free_now']}면"
+        if params.need_disabled and r.get("disabled") is None:
+            extra += " (장애인 구역 정보 없음 — 전화 확인 권장)"
         lines.append(
-            f"{r['rank']}. {r['name']} - {r['distance_m']}m, {formula}, 운영 {r['open']}"
+            f"{r['rank']}. {r['name']} - {r['distance_m']}m, {formula}, 운영 {r['open']}{extra}"
         )
     lines.append("마음에 안 들면 “더 저렴한 걸로”, “더 가까운 걸로”라고 말해 주세요.")
     return "\n".join(lines)
@@ -67,17 +72,25 @@ def _build_responder(streaming: bool):
     return prompt | llm
 
 
-def _candidates_text(ranked: list[dict]) -> str:
-    return "\n".join(
-        f"- {r['name']} {r['distance_m']}m {r['fee']}원 운영{r['open']}" for r in ranked
-    )
+def _candidates_text(ranked: list[dict], need_disabled: bool = False) -> str:
+    lines = []
+    for r in ranked:
+        extra = ""
+        if r.get("free_now") is not None:
+            extra += f" 잔여{r['free_now']}면"
+        if need_disabled and r.get("disabled") is None:
+            extra += " [장애인구역 정보없음]"
+        lines.append(
+            f"- {r['name']} {r['distance_m']}m {r['fee']}원 운영{r['open']}{extra}"
+        )
+    return "\n".join(lines)
 
 
 def _chain_input(user_text: str, params: RankingParams, ranked: list[dict]) -> dict:
     return {
         "user_text": user_text,
         "params_json": params.model_dump_json(),
-        "candidates": _candidates_text(ranked),
+        "candidates": _candidates_text(ranked, params.need_disabled),
     }
 
 

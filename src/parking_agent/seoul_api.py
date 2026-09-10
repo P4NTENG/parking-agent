@@ -21,6 +21,7 @@ load_dotenv()
 BASE_URL = "http://openapi.seoul.go.kr:8088"
 SERVICE = "GetParkingInfo"
 CACHE_PATH = Path(__file__).resolve().parents[2] / "data" / "seoul_cache.json"
+GEOCODE_PATH = Path(__file__).resolve().parents[2] / "data" / "geocode_cache.json"
 
 
 def _api_key() -> str:
@@ -107,7 +108,7 @@ def parse_row(row: dict) -> dict:
         "open_time": _hhmm_to_hh_mm(row.get("WD_OPER_BGNG_TM"), "00:00"),
         "close_time": _hhmm_to_hh_mm(row.get("WD_OPER_END_TM"), "23:59"),
         "free": free,
-        "disabled": False,  # 서울시 API에 없음
+        "disabled": None,  # 서울시 API에 없음 → None(미상). rank는 미상 통과.
         "realtime": {
             "total": total,
             "now": now,
@@ -135,6 +136,15 @@ def _rows_from_cache(path: Path) -> list[dict] | None:
     raise RuntimeError(f"캐시 형식 오류: {path}")
 
 
+def _geocode_map() -> dict:
+    if not GEOCODE_PATH.exists():
+        return {}
+    try:
+        return json.loads(GEOCODE_PATH.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return {}
+
+
 def load_seoul_candidates(
     rows: list[dict] | None = None,
     cache_path: Path | str | None = CACHE_PATH,
@@ -144,4 +154,14 @@ def load_seoul_candidates(
         rows = _rows_from_cache(Path(cache_path))
     if rows is None:
         rows = fetch_all()
-    return [parse_row(r) for r in rows]
+    geo = _geocode_map()
+    out = []
+    for r in rows:
+        parsed = parse_row(r)
+        hit = geo.get(parsed["id"])
+        if hit:
+            parsed["lat"] = float(hit["lat"])
+            parsed["lon"] = float(hit["lon"])
+            parsed["needs_geocode"] = False
+        out.append(parsed)
+    return out

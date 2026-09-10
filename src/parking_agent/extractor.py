@@ -129,4 +129,19 @@ def extract_params(text: str, prev: RankingParams | None = None) -> tuple[Rankin
     params = _rule_extract(text)
     if prev is not None:
         params = prev.merge(params)
+        # 부정어("무료 말고/일반으로")는 merge가 유지해버리므로 명시 해제
+        if re.search(r"말고|빼고|제외|일반으로", text) and (
+            "무료" in text or prev.prefer_free
+        ):
+            params = params.model_copy(update={"prefer_free": False})
+            if params.sort_by == "free_first":
+                params = params.model_copy(
+                    update={
+                        "sort_by": (
+                            "price"
+                            if re.search(r"저렴|싼|가성비", text)
+                            else "recommended"
+                        )
+                    }
+                )
     return params, "rule"
