@@ -9,27 +9,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
-from parking_agent.data_loader import load_candidates  # noqa: E402
 from parking_agent.extractor import extract_params  # noqa: E402
-from parking_agent.geo import geocode_place  # noqa: E402
+from parking_agent.guardrails import check_request  # noqa: E402
 from parking_agent.rank import rank_candidates  # noqa: E402
 from parking_agent.responder import format_answer  # noqa: E402
 from parking_agent.schemas import RankingParams  # noqa: E402
-
-
-def _load_candidates_by_source() -> tuple[list[dict], str]:
-    """PARKING_SOURCE=mock(기본)|seoul. seoul은 seoul_api 모듈 필요."""
-    source = os.getenv("PARKING_SOURCE", "mock").strip().lower()
-    if source == "seoul":
-        try:
-            from parking_agent.seoul_api import load_seoul_candidates
-        except ImportError as e:
-            raise RuntimeError(
-                "PARKING_SOURCE=seoul이지만 parking_agent.seoul_api 모듈이 없다. "
-                "docs/SEOUL_API.md §5 순서대로 seoul_api.py를 먼저 구현하라."
-            ) from e
-        return load_seoul_candidates(), "seoul"
-    return load_candidates(), "mock"
+from parking_agent.tools import geocode_place_tool, search_parking_tool  # noqa: E402
 
 
 def run_turn(
@@ -42,17 +27,22 @@ def run_turn(
     params, source = extract_params(user_text, prev)
     trace: dict = {"source": source, "params": params.model_dump()}
 
-    if not params.place:
+    ok, note, params = check_request(params)
+    trace["params"] = params.model_dump()
+    if note:
+        trace["guardrail_note"] = note
+    if not ok:
         return {
             "params": params,
             "ranked": [],
-            "answer": "어느 장소 근처인지 알려주세요. 예: “강남역 근처 2시간 주차 알려줘”",
-            "trace": {**trace, "error": "no_place"},
+            "answer": note,
+            "trace": {**trace, "error": "guardrail_block"},
             "needs_clarification": True,
         }
 
-    coord = geocode_place(params.place)
-    if coord is None:
+    geo = geocode_place_tool.invoke({"place": params.place})
+    trace["geocode"] = geo
+    if not geo.get("lat"):
         return {
             "params": params,
             "ranked": [],
@@ -63,9 +53,11 @@ def run_turn(
             "trace": {**trace, "error": "geocode_fail"},
             "needs_clarification": True,
         }
-    lat, lon = coord
+    lat, lon = geo["lat"], geo["lon"]
     try:
-        candidates, data_source = _load_candidates_by_source()
+        candidates = search_parking_tool.invoke(
+            {"lat": lat, "lon": lon, "radius_km": params.radius_km}
+        )
     except RuntimeError as e:
         return {
             "params": params,
@@ -89,8 +81,7 @@ def run_turn(
     )
     trace.update(
         {
-            "coord": coord,
-            "data_source": data_source,
+            "data_source": os.getenv("PARKING_SOURCE", "mock").strip().lower(),
             "candidates": len(candidates),
             "ranked_ids": [r["id"] for r in ranked],
         }

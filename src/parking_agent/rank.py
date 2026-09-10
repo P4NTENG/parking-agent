@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from .fee import estimate_fee
 from .geo import haversine_km
+from .tools import estimate_fee_tool
 
 
 def _open_at_minutes(t: str) -> int:
@@ -47,8 +47,14 @@ def rank_candidates(
             continue
         if not is_open(c, open_at):
             continue
-        fee = estimate_fee(
-            c["base_minutes"], c["base_fee"], c["unit_minutes"], c["unit_fee"], minutes
+        fee = estimate_fee_tool.invoke(
+            {
+                "base_minutes": c["base_minutes"],
+                "base_fee": c["base_fee"],
+                "unit_minutes": c["unit_minutes"],
+                "unit_fee": c["unit_fee"],
+                "minutes": minutes,
+            }
         )
         if max_price is not None and fee > max_price:
             continue

@@ -19,14 +19,15 @@
 ```mermaid
 flowchart TD
     U["사용자 질의\n(예: 강남역 근처 2시간 주차)"] --> E["extract_params\n+ prev 병합(리랭킹)"]
-    E -->|"OPENAI_API_KEY 있음"| L1["LangChain: ChatOpenAI\nwith_structured_output(RankingParams)"]
+    E -->|"OPENAI_API_KEY 있음"| L1["LangChain: ChatPromptTemplate |\nwith_structured_output(RankingParams)"]
     E -->|"키 없음 / 실패 / NO_LLM=1"| R1["규칙 기반 추출\n(정규식 + 키워드)"]
     L1 --> P["RankingParams\nplace/minutes/sort_by 등"]
     R1 --> P
-    P -->|"place 없음"| C1["명확화 질문\n'어느 장소 근처인지 알려주세요'"]
-    P --> G["geocode_place (Mock 딕셔너리)"]
+    P --> G0["가드레일 check_request\n(장소 필수, 범위 보정)"]
+    G0 -->|"차단"| C1["명확화 질문\n'어느 장소 근처인지 알려주세요'"]
+    G0 -->|"통과"| G["@tool: geocode_place_tool"]
     G -->|"좌표 없음"| C2["폴백 안내\n'강남역/홍대입구/시청 중에서'"]
-    G -->|"좌표 있음"| D["후보 조회\nPARKING_SOURCE에 따라 분기"]
+    G -->|"좌표 있음"| D["후보 조회 (@tool)\nPARKING_SOURCE에 따라 분기"]
     D -->|"mock (기본)"| D1["load_candidates\n(data/seed_sample.csv)"]
     D -->|"seoul"| D2["load_seoul_candidates\n(서울시 GetParkingInfo 캐시)"]
     D1 --> K["rank_candidates\n거리+요금 결정적 정렬"]
@@ -42,8 +43,8 @@ flowchart TD
 ```
 사용자 질의 ("강남역 근처 2시간 주차")
  → extract_params (LLM structured output, 키 없거나 NO_LLM이면 규칙 기반 폴백)
- → geocode_place (내장 좌표; 카카오 지오코딩은 키 발급 후)
- → load_candidates (seed CSV, 기본) 또는 load_seoul_candidates (PARKING_SOURCE=seoul)
+ → check_request 가드레일 (장소 필수, 시간·반경 범위 보정)
+ → @tool 호출: geocode_place_tool → search_parking_tool (seed CSV 또는 서울시 캐시)
  → rank_candidates (거리+요금 결정적 정렬)
  → format_answer (LLM 설명, 키 없으면 템플릿 폴백)
  → 후속 발화 ("너무 비싸") + prev 병합 → 리랭킹
