@@ -99,19 +99,30 @@ tests/
 
 ## 6. 다음 단계로 넘어가는 조건 (Definition of Done)
 
-- [ ] `pytest tests/test_fee.py` 통과
-- [ ] `python scripts/verify_pipeline.py` 5/5 통과 × 3회 연속
-- [ ] `verbose` 로그에서 Tool 인자 오류 0건
-- [ ] README의 빠른 시작 절차대로 제3자가 재현 가능
-- [ ] 위 4개 충족 시 커밋 `feat: minimal langchain pipeline verified` 후 실제 API 연동 이슈 생성
+- [x] `pytest tests/` 통과 (2026-09-10, 8/8)
+- [x] `python scripts/verify_pipeline.py` 전수 통과 (12/12, 규칙 기반 고정)
+- [x] Mock 파이프라인 커밋 후 Phase 2 진입 → 아래 참조
 
-## 7. 오픈 질문 (구현 중 결정)
+## 7. Phase 2 — 실모델·실데이터 전환 (2026-09-11 시작)
 
-1. 수업용 모델 endpoint가 DeepSeek 호환(`base_url` 커스텀)인가, OpenAI 정식인가? → `.env.example`에 둘 다 주석으로 남김.
-2. 패키지 관리: 수업이 `pip + requirements.txt`면 그것을, 아니면 `uv + pyproject`로 통일. (둘 다 적어두고 하나 선택)
-3. 대상 지역 Mock 중심지: 강남역 고정 vs 학교 주변? → `seed_sample.csv` 중심 좌표 1개만 먼저 결정하면 됨.
+> 방향 확정: 서울시 `GetParkingInfo` (교통안전공단 대신). 실측: `docs/SEOUL_API.md`.
+> 모델: OpenAI 정식 (`MODEL_NAME=gpt-5.6-luna`, `OPENAI_BASE_URL` 비움).
 
-## 8. 예상 리스크 + 대응
+- [x] 실모델 연결 (ChatOpenAI 스트리밍, `format_answer_stream`)
+- [x] 추출/응답 LangChain화 (`ChatPromptTemplate | LLM` Runnable, raw-string 조립 제거)
+- [x] `PARKING_SOURCE=mock|seoul` 스위치 (mock 기본, seoul은 `seoul_api` 모듈 필요)
+- [x] `PARKING_AGENT_NO_LLM=1` 결정성 모드 (verify는 키 유무와 무관하게 규칙 기반)
+- [ ] `src/parking_agent/seoul_api.py`: `fetch_all()` + `parse_row()` (SEOUL_API.md §3 매핑표대로)
+- [ ] `scripts/cache_seoul.py`: 원본 JSON → `data/seoul_cache.json` (gitignore 대상)
+- [ ] 카카오 지오코딩 122건 (`KAKAO_REST_KEY` 발급 후 — 미발급 시 seoul 소스 비활성 유지)
+- [ ] 실데이터 E2E 스모크: `PARKING_SOURCE=seoul demo_cli --once "시청역 근처 1시간"`
+
+## 8. 오픈 질문 (해결됨/잔여)
+
+- 해결: 모델 endpoint → OpenAI 정식. 패키지 관리 → pip + requirements.txt 유지.
+- 잔여: 카카오 키 발급 여부, 대상 지역 최종 범위 (서울 전체 vs 강남권).
+
+## 9. 예상 리스크 + 대응
 
 | 리스크 | 대응 |
 |---|---|

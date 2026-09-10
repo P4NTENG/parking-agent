@@ -38,29 +38,47 @@ def _template_answer(params: RankingParams, ranked: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _build_llm():
+_RESPOND_SYS = (
+    "너는 주차장 추천 비서다. 후보와 요금 계산식을 근거로 1~3순위를 설명하라. "
+    "할루시네이션 금지, 후보 외 장소 언급 금지."
+)
+
+
+def _build_responder(streaming: bool):
+    """ChatPromptTemplate | LLM Runnable. LangChain 스타일 조립."""
+    from langchain_core.prompts import ChatPromptTemplate
     from langchain_openai import ChatOpenAI
 
-    return ChatOpenAI(
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", _RESPOND_SYS),
+            (
+                "human",
+                "사용자: {user_text}\n파라미터: {params_json}\n후보:\n{candidates}",
+            ),
+        ]
+    )
+    llm = ChatOpenAI(
         model=os.getenv("MODEL_NAME", "deepseek-v4-flash"),
         base_url=os.getenv("OPENAI_BASE_URL") or None,
         temperature=0.2,
-        streaming=True,
+        streaming=streaming,
+    )
+    return prompt | llm
+
+
+def _candidates_text(ranked: list[dict]) -> str:
+    return "\n".join(
+        f"- {r['name']} {r['distance_m']}m {r['fee']}원 운영{r['open']}" for r in ranked
     )
 
 
-def _build_prompt(
-    user_text: str, params: RankingParams, ranked: list[dict]
-) -> str:
-    cand = "\n".join(
-        f"- {r['name']} {r['distance_m']}m {r['fee']}원 운영{r['open']}"
-        for r in ranked
-    )
-    return (
-        "너는 주차장 추천 비서다. 후보와 요금 계산식을 근거로 1~3순위를 설명하라. "
-        "할루시네이션 금지, 후보 외 장소 언급 금지.\n"
-        f"사용자: {user_text}\n파라미터: {params.model_dump_json()}\n후보:\n{cand}"
-    )
+def _chain_input(user_text: str, params: RankingParams, ranked: list[dict]) -> dict:
+    return {
+        "user_text": user_text,
+        "params_json": params.model_dump_json(),
+        "candidates": _candidates_text(ranked),
+    }
 
 
 def format_answer_stream(
@@ -71,8 +89,9 @@ def format_answer_stream(
     suffix = f"\n\n[추출:{trace.get('source')} sort={params.sort_by}]"
     if api_key and ranked:
         try:
-            llm = _build_llm()
-            for chunk in llm.stream(_build_prompt(user_text, params, ranked)):
+            for chunk in _build_responder(streaming=True).stream(
+                _chain_input(user_text, params, ranked)
+            ):
                 content = chunk.content
                 text = content if isinstance(content, str) else str(content)
                 if text:
@@ -101,15 +120,9 @@ def format_answer(
         api_key = os.getenv("OPENAI_API_KEY", "")
         if api_key and ranked:
             try:
-                from langchain_openai import ChatOpenAI
-
-                llm = ChatOpenAI(
-                    model=os.getenv("MODEL_NAME", "deepseek-v4-flash"),
-                    base_url=os.getenv("OPENAI_BASE_URL") or None,
-                    temperature=0.2,
-                    streaming=False,
+                resp = _build_responder(streaming=False).invoke(
+                    _chain_input(user_text, params, ranked)
                 )
-                resp = llm.invoke(_build_prompt(user_text, params, ranked))
                 content = resp.content if isinstance(resp.content, str) else str(resp.content)
                 return content + f"\n\n[추출:{trace.get('source')} sort={params.sort_by}]"
             except Exception as e:

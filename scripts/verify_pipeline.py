@@ -1,9 +1,15 @@
-"""키 없이 실행 가능한 자동 검증. 추출→랭킹→리랭킹 시나리오 5건."""
+"""키 없이 실행 가능한 자동 검증. 추출→랭킹→리랭킹 시나리오."""
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
+
+# 키가 있어도 규칙 기반 경로로 고정 → 결정적 검증 (LLM 품질은 demo/수동으로 별도 확인)
+os.environ.setdefault("PARKING_AGENT_NO_LLM", "1")
+os.environ.setdefault("PARKING_SOURCE", "mock")
+os.environ.setdefault("LLM_STREAM", "false")
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 

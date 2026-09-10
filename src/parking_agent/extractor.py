@@ -92,21 +92,33 @@ def _rule_extract(text: str) -> RankingParams:
     )
 
 
+def _llm_disabled() -> bool:
+    """테스트 결정성용. 1이면 키가 있어도 규칙 기반 사용."""
+    return os.getenv("PARKING_AGENT_NO_LLM", "").strip().lower() in ("1", "true", "yes")
+
+
+def _build_extractor():
+    """ChatPromptTemplate | structured-LLM Runnable. LangChain 스타일 조립."""
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_openai import ChatOpenAI
+
+    prompt = ChatPromptTemplate.from_messages(
+        [("system", _EXTRACT_SYS), ("human", "발화: {utterance}")]
+    )
+    llm = ChatOpenAI(
+        model=os.getenv("MODEL_NAME", "deepseek-v4-flash"),
+        base_url=os.getenv("OPENAI_BASE_URL") or None,
+        temperature=0,
+    )
+    return prompt | llm.with_structured_output(RankingParams)
+
+
 def extract_params(text: str, prev: RankingParams | None = None) -> tuple[RankingParams, str]:
     """(params, source) 반환. source는 'llm' 또는 'rule'."""
     api_key = os.getenv("OPENAI_API_KEY", "")
-    if api_key:
+    if api_key and not _llm_disabled():
         try:
-            from langchain_openai import ChatOpenAI
-
-            llm = ChatOpenAI(
-                model=os.getenv("MODEL_NAME", "deepseek-v4-flash"),
-                base_url=os.getenv("OPENAI_BASE_URL") or None,
-                temperature=0,
-            )
-            structured = llm.with_structured_output(RankingParams)
-            prompt = f"{_EXTRACT_SYS}\n\n발화: {text}"
-            params = structured.invoke(prompt)
+            params = _build_extractor().invoke({"utterance": text})
             if isinstance(params, dict):
                 params = RankingParams(**params)
             if prev is not None:

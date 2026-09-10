@@ -1,7 +1,8 @@
-"""추출 → 조회(Mock) → 랭킹 → 응답 파이프라인. 리랭킹은 prev 병합으로 처리."""
+"""추출 → 조회(Mock/서울실데이터) → 랭킹 → 응답 파이프라인. 리랭킹은 prev 병합."""
 
 from __future__ import annotations
 
+import os
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -14,6 +15,21 @@ from parking_agent.geo import geocode_place  # noqa: E402
 from parking_agent.rank import rank_candidates  # noqa: E402
 from parking_agent.responder import format_answer  # noqa: E402
 from parking_agent.schemas import RankingParams  # noqa: E402
+
+
+def _load_candidates_by_source() -> tuple[list[dict], str]:
+    """PARKING_SOURCE=mock(기본)|seoul. seoul은 seoul_api 모듈 필요."""
+    source = os.getenv("PARKING_SOURCE", "mock").strip().lower()
+    if source == "seoul":
+        try:
+            from parking_agent.seoul_api import load_seoul_candidates
+        except ImportError as e:
+            raise RuntimeError(
+                "PARKING_SOURCE=seoul이지만 parking_agent.seoul_api 모듈이 없다. "
+                "docs/SEOUL_API.md §5 순서대로 seoul_api.py를 먼저 구현하라."
+            ) from e
+        return load_seoul_candidates(), "seoul"
+    return load_candidates(), "mock"
 
 
 def run_turn(
@@ -48,7 +64,16 @@ def run_turn(
             "needs_clarification": True,
         }
     lat, lon = coord
-    candidates = load_candidates()
+    try:
+        candidates, data_source = _load_candidates_by_source()
+    except RuntimeError as e:
+        return {
+            "params": params,
+            "ranked": [],
+            "answer": str(e),
+            "trace": {**trace, "error": "no_data_source"},
+            "needs_clarification": True,
+        }
     ranked = rank_candidates(
         candidates,
         lat,
@@ -63,7 +88,12 @@ def run_turn(
         top_k=params.top_k,
     )
     trace.update(
-        {"coord": coord, "candidates": len(candidates), "ranked_ids": [r["id"] for r in ranked]}
+        {
+            "coord": coord,
+            "data_source": data_source,
+            "candidates": len(candidates),
+            "ranked_ids": [r["id"] for r in ranked],
+        }
     )
     answer = format_answer(user_text, params, ranked, trace, stream=stream, on_token=on_token)
     return {
