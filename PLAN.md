@@ -112,10 +112,10 @@ tests/
 - [x] 추출/응답 LangChain화 (`ChatPromptTemplate | LLM` Runnable, raw-string 조립 제거)
 - [x] `PARKING_SOURCE=mock|seoul` 스위치 (mock 기본, seoul은 `seoul_api` 모듈 필요)
 - [x] `PARKING_AGENT_NO_LLM=1` 결정성 모드 (verify는 키 유무와 무관하게 규칙 기반)
-- [ ] `src/parking_agent/seoul_api.py`: `fetch_all()` + `parse_row()` (SEOUL_API.md §3 매핑표대로)
-- [ ] `scripts/cache_seoul.py`: 원본 JSON → `data/seoul_cache.json` (gitignore 대상)
+- [x] `src/parking_agent/seoul_api.py`: `fetch_all()` + `parse_row()` (SEOUL_API.md §3 매핑표대로)
+- [x] `scripts/cache_seoul.py`: 원본 JSON → `data/seoul_cache.json` (gitignore 대상, 122건 확인)
 - [ ] 카카오 지오코딩 122건 (`KAKAO_REST_KEY` 발급 후 — 미발급 시 seoul 소스 비활성 유지)
-- [ ] 실데이터 E2E 스모크: `PARKING_SOURCE=seoul demo_cli --once "시청역 근처 1시간"`
+- [x] 실데이터 E2E 스모크: `PARKING_SOURCE=seoul demo_cli` (지오코딩 전이라 정상적으로 0건 폴백)
 
 ## 8. 오픈 질문 (해결됨/잔여)
 
