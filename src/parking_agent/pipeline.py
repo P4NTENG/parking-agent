@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
@@ -16,8 +17,12 @@ from parking_agent.schemas import RankingParams  # noqa: E402
 
 
 def run_turn(
-    user_text: str, prev: RankingParams | None = None
+    user_text: str,
+    prev: RankingParams | None = None,
+    stream: bool | None = None,
+    on_token: Callable[[str], None] | None = None,
 ) -> dict:
+    """stream=None이면 LLM_STREAM env(기본 true)를 따른다."""
     params, source = extract_params(user_text, prev)
     trace: dict = {"source": source, "params": params.model_dump()}
 
@@ -60,7 +65,7 @@ def run_turn(
     trace.update(
         {"coord": coord, "candidates": len(candidates), "ranked_ids": [r["id"] for r in ranked]}
     )
-    answer = format_answer(user_text, params, ranked, trace)
+    answer = format_answer(user_text, params, ranked, trace, stream=stream, on_token=on_token)
     return {
         "params": params,
         "ranked": ranked,

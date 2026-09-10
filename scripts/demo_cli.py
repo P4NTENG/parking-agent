@@ -23,8 +23,11 @@ def main() -> None:
         pass
     print(BANNER)
     once = "--once" in sys.argv
+    no_stream = "--no-stream" in sys.argv
+    stream = not no_stream
     prev = None
-    first = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else None
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    first = args[0] if args else None
     pending = [first] if first else []
     while True:
         try:
@@ -35,12 +38,28 @@ def main() -> None:
             continue
         if text.lower() in ("quit", "exit", "q"):
             break
-        out = run_turn(text, prev)
-        prev = out["params"]
-        print(f"\n[파라미터] {out['params'].model_dump()} (추출:{out['trace'].get('source')})")
-        if out["ranked"]:
-            print(f"[랭킹] {' > '.join(r['id'] for r in out['ranked'])}")
-        print(f"\n에이전트: {out['answer']}\n")
+
+        def _on_token(token: str) -> None:
+            print(token, end="", flush=True)
+
+        if stream:
+            # 진짜 LLM 토큰 스트리밍: 답변 토큰이 오는 대로 출력.
+            # 파라미터/랭킹은 추출 후 알 수 있어 답변 뒤에 표시한다.
+            print("\n에이전트: ", end="", flush=True)
+            out = run_turn(text, prev, stream=True, on_token=_on_token)
+            prev = out["params"]
+            print()  # 스트림 종료 줄바꿈
+            print(f"[파라미터] {out['params'].model_dump()} (추출:{out['trace'].get('source')})")
+            if out["ranked"]:
+                print(f"[랭킹] {' > '.join(r['id'] for r in out['ranked'])}")
+            print()
+        else:
+            out = run_turn(text, prev, stream=False)
+            prev = out["params"]
+            print(f"\n[파라미터] {out['params'].model_dump()} (추출:{out['trace'].get('source')})")
+            if out["ranked"]:
+                print(f"[랭킹] {' > '.join(r['id'] for r in out['ranked'])}")
+            print(f"\n에이전트: {out['answer']}\n")
         if once and not pending:
             break
 
