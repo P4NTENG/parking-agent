@@ -15,6 +15,26 @@
 
 ## 최소 파이프라인 (LangChain, LangGraph 없음)
 
+```mermaid
+flowchart TD
+    U["사용자 질의\n(예: 강남역 근처 2시간 주차)"] --> E["extract_params\n+ prev 병합(리랭킹)"]
+    E -->|"OPENAI_API_KEY 있음"| L1["LangChain: ChatOpenAI\nwith_structured_output(RankingParams)"]
+    E -->|"키 없음 / 실패"| R1["규칙 기반 추출\n(정규식 + 키워드)"]
+    L1 --> P["RankingParams\nplace/minutes/sort_by 등"]
+    R1 --> P
+    P -->|"place 없음"| C1["명확화 질문\n'어느 장소 근처인지 알려주세요'"]
+    P --> G["geocode_place (Mock 딕셔너리)"]
+    G -->|"좌표 없음"| C2["폴백 안내\n'강남역/홍대입구/시청 중에서'"]
+    G -->|"좌표 있음"| D["load_candidates\n(data/seed_sample.csv)"]
+    D --> K["rank_candidates\n거리+요금 결정적 정렬"]
+    K --> F["format_answer"]
+    F -->|"키 있음 (기본 스트리밍)"| L2["LangChain: ChatOpenAI.stream()\n토큰 단위 출력"]
+    F -->|"키 없음"| T["템플릿 응답\n(요금 계산식 포함)"]
+    L2 --> A["최종 답변"]
+    T --> A
+    A -.->|"후속 발화\n(너무 비싸 / 30분만)"| U
+```
+
 ```
 사용자 질의 ("강남역 근처 2시간 주차")
  → extract_params (LLM structured output, 키 없으면 규칙 기반 폴백)
