@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Env / keys
+.env
+.env.local
+
+# Data (large)
+data/*.csv
+data/*.xls
+data/*.json
+!data/seed_sample.csv
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
