@@ -1,0 +1,2 @@
+# Normalize line endings (silences LF/CRLF warnings on Windows)
+* text=auto

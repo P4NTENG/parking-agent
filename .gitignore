@@ -24,5 +24,9 @@ Thumbs.db
 # Logs
 *.log
 
+# Test / cache
+.pytest_cache/
+.ruff_cache/
+
 # Cross-agent signals (transient, do not commit)
 .wmux-inbox/
