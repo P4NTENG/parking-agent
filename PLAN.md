@@ -3,6 +3,9 @@
 > 작성일: 2026-09-10 / 작업 폴더: `D:\git\parking-agent` (git init 완료, 빈 repo에서 시작)
 > 원칙 1: 기능 고도화보다 **파이프라인 동작 검증**이 우선
 > 원칙 2: **LangChain까지만 사용. LangGraph 금지** (수업이 LangChain 프레임워크부터 시작했으므로)
+>
+> 상태(2026-09-11): Phase 1 완료. 아래 §§1–5는 Phase 1 기록으로 유지한다.
+> Phase 2(실모델·실데이터 전환) 현황은 §7 참조. 실제 구현은 README의 파이프라인 절이 최신이다.
 
 ## 1. 배경
 
@@ -21,18 +24,26 @@
 4. `estimate_fee`: 각 후보에 대해 `기본요금 + ceil((minutes-기본시간)/추가단위)*추가요금` 계산. 순수함수이므로 단위테스트 가능.
 5. LLM 종합: 후보 + 요금을 근거로 1~3순위 추천. 요금 계산식 명시.
 
-### 2.2 LangChain 구성 (LangGraph 없음)
+### 2.2 LangChain 구성 (LangGraph 없음) — Phase 1 기록
 
-- `ChatOpenAI(model=수업용 Flash급, temperature=0)` — `langchain-openai`
-- `ChatPromptTemplate` — 시스템 프롬프트에 "반드시 Tool을 써서 근거를 만들 것" 지시
-- `Tool` 3개 — `@tool` 데코레이터 (`langchain-core`)
-- `AgentExecutor` — `create_tool_calling_agent()` + `AgentExecutor(..., verbose=True)` 조합
-- 실행 확인은 `scripts/demo_cli.py`의 단일 질의 + `scripts/verify_pipeline.py`의 5개 시나리오
+> 실제 구현은 AgentExecutor 방식이 아니라 아래 구조로 확정됐다.
+> 최신 아키텍처는 README 참조.
 
-왜 `AgentExecutor`인가: 수업에서 배우는 고전 LangChain Agent 실행기이며,
-`StateGraph/ToolNode` 같은 LangGraph 개념 없이도 Tool 호출 루프를 검증할 수 있다.
+- ~~`AgentExecutor` + `@tool` 3종~~ → `extract_params` (구조화 추출) +
+  결정적 `rank_candidates` + `format_answer` (설명) 분리 구조로 변경.
+  추출·응답만 LLM이 맡고 순서는 코드가 정해 검증이 쉽다.
+- `ChatOpenAI` + `ChatPromptTemplate | LLM` Runnable (추출: `temperature=0`,
+  응답: `temperature=0.2` + 기본 스트리밍)
+- 실행 확인은 `scripts/demo_cli.py` + `scripts/verify_pipeline.py`
+  (`PARKING_AGENT_NO_LLM=1` 고정으로 키 유무와 무관하게 결정적)
 
-## 3. 파일 구성 (최소)
+## 3. 파일 구성 — Phase 1 기록 (실제는 아래와 다름, 최신은 repo 참조)
+
+> 실제 구성: `src/parking_agent/` =
+> `schemas.py(RankingParams)` · `extractor.py(추출)` · `geo.py` · `data_loader.py` ·
+> `seoul_api.py(실데이터)` · `rank.py` · `responder.py(응답)` · `pipeline.py(조립)`,
+> `scripts/` = `demo_cli.py` · `verify_pipeline.py` · `cache_seoul.py`,
+> `tests/` = `test_fee.py` · `test_rank.py`.
 
 ```
 pyproject.toml 또는 requirements.txt
