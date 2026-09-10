@@ -23,3 +23,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Cross-agent signals (transient, do not commit)
+.wmux-inbox/
