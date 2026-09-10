@@ -86,6 +86,14 @@ python -m pytest tests/ -q
 - [x] `place/minutes/sort_by` 추출 정확 (S1~S4)
 - [x] 장소 미지정/지오코딩 실패 시 폴백 안내 (S5/S6, 스택 노출 없음)
 - [x] 최종 답변에 요금 근거(계산식) 포함
-- [x] `pytest 8/8` + `verify 12/12` 통과 (rule 기반)
+- [x] `pytest 18/18` + `verify 12/12` 통과 (rule 기반)
+
+## 알려진 제한
+
+- Mock 지오코딩은 강남역/홍대입구/시청/역삼역만 안다. 그 외(예: 은평구)는
+  좌표 실패 안내가 나간다. 카카오 키 발급 후 실지오코딩으로 교체 예정.
+- `PARKING_SOURCE=seoul`은 122건 캐치까지 되나 위경도가 없어 반경 필터에
+  걸린다. 지오코딩 백필 후 정상 랭킹 가능.
+- 스트리밍 모드에서 명확화/폴백 답변은 토큰 없이 완성본으로 출력된다.
 
 자세한 단계별 계획은 [PLAN.md](./PLAN.md), 필요한 키 정리는 [docs/KEYS_NEEDED.md](./docs/KEYS_NEEDED.md) 참조.

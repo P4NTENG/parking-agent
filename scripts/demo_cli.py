@@ -39,7 +39,10 @@ def main() -> None:
         if text.lower() in ("quit", "exit", "q"):
             break
 
+        emitted = [0]
+
         def _on_token(token: str) -> None:
+            emitted[0] += 1
             print(token, end="", flush=True)
 
         if stream:
@@ -49,6 +52,9 @@ def main() -> None:
             out = run_turn(text, prev, stream=True, on_token=_on_token)
             prev = out["params"]
             print()  # 스트림 종료 줄바꿈
+            if emitted[0] == 0:
+                # 명확화/폴백 경로는 스트리밍 토큰이 없으므로 완성본 출력
+                print(f"에이전트: {out['answer']}")
             print(f"[파라미터] {out['params'].model_dump()} (추출:{out['trace'].get('source')})")
             if out["ranked"]:
                 print(f"[랭킹] {' > '.join(r['id'] for r in out['ranked'])}")
